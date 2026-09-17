@@ -141,3 +141,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Variáveis de ambiente locais específicas
+.env.local
+
+# Arquivos do sistema operacional e IDE
+.DS_Store
+.idea/

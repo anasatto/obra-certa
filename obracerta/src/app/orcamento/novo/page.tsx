@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "../../lib/supabase";
+import MenuLateral from "../../components/MenuLateral";
 
 interface ItemOrcamento {
   id: string;
@@ -11,6 +13,8 @@ interface ItemOrcamento {
 
 export default function NovoOrcamentoPage() {
   const router = useRouter();
+  const [carregandoAuth, setCarregandoAuth] = useState(true);
+  const [userEmail, setUserEmail] = useState("Profissional");
 
   const [nomeCliente, setNomeCliente] = useState("");
   const [telefoneCliente, setTelefoneCliente] = useState("");
@@ -20,16 +24,33 @@ export default function NovoOrcamentoPage() {
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    const checkAuth = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        router.replace("/login");
+      } else {
+        if (session.user?.email) {
+          setUserEmail(session.user.email.split("@")[0]);
+        }
+        setCarregandoAuth(false);
+      }
+    };
+    checkAuth();
+  }, [router]);
+
   const adicionarItem = () => {
-    setItens([
-      ...itens,
+    setItens((prev) => [
+      ...prev,
       { id: Date.now().toString(), descricao: "", valor: 0 },
     ]);
   };
 
   const removerItem = (id: string) => {
     if (itens.length === 1) return;
-    setItens(itens.filter((item) => item.id !== id));
+    setItens((prev) => prev.filter((item) => item.id !== id));
   };
 
   const atualizarItem = (
@@ -37,8 +58,8 @@ export default function NovoOrcamentoPage() {
     campo: "descricao" | "valor",
     valor: string
   ) => {
-    setItens(
-      itens.map((item) => {
+    setItens((prev) =>
+      prev.map((item) => {
         if (item.id === id) {
           return {
             ...item,
@@ -65,19 +86,18 @@ export default function NovoOrcamentoPage() {
         clienteNome: nomeCliente,
         clienteTelefone: telefoneCliente.replace(/\D/g, ""),
         dataCriacao: dataHoje,
-        valorTotal: valorTotal,
+        valorTotal,
         status: "pendente",
-        itens: itens,
-        validadeDias: validadeDias,
+        itens,
+        validadeDias,
       };
 
       const orcamentosExistentes = JSON.parse(
         localStorage.getItem("obracerta_orcamentos") || "[]"
       );
-      const listaAtualizada = [novoOrcamento, ...orcamentosExistentes];
       localStorage.setItem(
         "obracerta_orcamentos",
-        JSON.stringify(listaAtualizada)
+        JSON.stringify([novoOrcamento, ...orcamentosExistentes])
       );
 
       const linkPublico = `${window.location.origin}/o/${orcamentoId}`;
@@ -89,93 +109,84 @@ export default function NovoOrcamentoPage() {
           `⏳ *Garantia deste preço:* Mantido por ${validadeDias} dias`
       );
 
-      const whatsappUrl = `https://api.whatsapp.com/send?phone=55${novoOrcamento.clienteTelefone}&text=${mensagem}`;
-      window.open(whatsappUrl, "_blank");
+      window.open(
+        `https://api.whatsapp.com/send?phone=55${novoOrcamento.clienteTelefone}&text=${mensagem}`,
+        "_blank"
+      );
 
       router.push("/orcamentos");
-    } catch (error) {
+    } catch {
       alert("Erro ao salvar o orçamento.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  if (carregandoAuth) {
+    return (
+      <div className="min-vh-100 bg-light d-flex justify-content-center align-items-center">
+        <div className="spinner-border text-success" role="status"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-light min-vh-100 pb-5">
-      <header className="bg-dark text-white sticky-top shadow-sm border-bottom border-warning border-3 px-3 py-3">
+      <MenuLateral />
+
+      {/* Header Estilo Minimalista e Limpo - Idêntico ao Dashboard */}
+      <header className="bg-white border-bottom border-light px-3 py-3 sticky-top">
         <div
           className="container p-0 d-flex align-items-center justify-content-between"
           style={{ maxWidth: "500px" }}
         >
-          <div className="d-flex align-items-center gap-2">
-            <button
-              className="btn btn-outline-light btn-sm border-0 fs-5 p-1"
-              type="button"
-              data-bs-toggle="offcanvas"
-              data-bs-target="#menuLateral"
-            >
-              <i className="bi bi-list"></i>
-            </button>
-            <div>
-              <h1 className="h6 mb-0 fw-bold text-uppercase">ObraCerta</h1>
-              <small className="text-warning" style={{ fontSize: "0.75rem" }}>
-                Novo Orçamento
-              </small>
-            </div>
-          </div>
-
           <button
+            className="btn btn-light btn-sm rounded-circle p-2 border-0 d-flex align-items-center justify-content-center"
             type="button"
-            onClick={() => router.push("/orcamentos")}
-            className="btn btn-outline-light btn-sm rounded-pill fw-semibold px-3"
+            data-bs-toggle="offcanvas"
+            data-bs-target="#menuLateral"
+            style={{ width: "38px", height: "38px" }}
           >
-            Meus Orçamentos
+            <i className="bi bi-list fs-5 text-dark"></i>
           </button>
+
+          <span
+            className="fw-black fs-5 tracking-tight"
+            style={{ color: "var(--color-teal-dark)" }}
+          >
+            ObraCerta
+          </span>
+
+          <div
+            className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white small"
+            style={{
+              width: "36px",
+              height: "36px",
+              backgroundColor: "var(--color-teal-dark)",
+            }}
+          >
+            {userEmail.substring(0, 2).toUpperCase()}
+          </div>
         </div>
       </header>
 
-      {/* Menu Lateral */}
-      <div
-        className="offcanvas offcanvas-start bg-dark text-white"
-        tabIndex={-1}
-        id="menuLateral"
-        style={{ maxWidth: "280px" }}
-      >
-        <div className="offcanvas-header border-bottom border-secondary">
-          <h5 className="offcanvas-title h6 fw-bold mb-0">ObraCerta App</h5>
-          <button
-            type="button"
-            className="btn-close btn-close-white"
-            data-bs-dismiss="offcanvas"
-          ></button>
+      <main className="container py-4 px-3" style={{ maxWidth: "500px" }}>
+        {/* Título de Entrada */}
+        <div className="mb-3">
+          <h1 className="h4 fw-black text-dark mb-0">Novo Orçamento</h1>
+          <small className="text-muted" style={{ fontSize: "0.8rem" }}>
+            Preencha os dados e gere o link para assinatura no WhatsApp
+          </small>
         </div>
-        <div className="offcanvas-body p-0 py-3">
-          <div className="list-group list-group-flush">
-            <button
-              onClick={() => router.push("/orcamento/novo")}
-              data-bs-dismiss="offcanvas"
-              className="list-group-item list-group-item-action bg-transparent text-white border-0 px-3 py-3 d-flex align-items-center gap-3 fw-bold active"
-            >
-              <i className="bi bi-plus-circle text-warning fs-5"></i>
-              <span>Novo Orçamento</span>
-            </button>
-            <button
-              onClick={() => router.push("/orcamentos")}
-              data-bs-dismiss="offcanvas"
-              className="list-group-item list-group-item-action bg-transparent text-white border-0 px-3 py-3 d-flex align-items-center gap-3"
-            >
-              <i className="bi bi-file-earmark-text text-warning fs-5"></i>
-              <span>Meus Orçamentos</span>
-            </button>
-          </div>
-        </div>
-      </div>
 
-      <main className="container py-3 px-3" style={{ maxWidth: "500px" }}>
         <form onSubmit={handleSubmit} className="d-flex flex-column gap-3">
-          <div className="card border-0 shadow-sm rounded-4 overflow-hidden">
+          {/* Passo 1: Dados do Cliente */}
+          <div className="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
             <div className="card-header bg-white border-0 pt-3 pb-0 px-3">
-              <span className="badge bg-warning text-dark fw-bold px-2 py-1 mb-1">
+              <span
+                className="badge font-monospace text-white fw-bold px-2 py-1 mb-1"
+                style={{ backgroundColor: "var(--color-teal-accent)" }}
+              >
                 Passo 1 de 2
               </span>
               <h2 className="h6 fw-bold mb-0 text-dark">
@@ -238,10 +249,14 @@ export default function NovoOrcamentoPage() {
             </div>
           </div>
 
-          <div className="card border-0 shadow-sm rounded-4 overflow-hidden">
+          {/* Passo 2: Itens do Serviço */}
+          <div className="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
             <div className="card-header bg-white border-0 pt-3 pb-2 px-3 d-flex justify-content-between align-items-center">
               <div>
-                <span className="badge bg-warning text-dark fw-bold px-2 py-1 mb-1">
+                <span
+                  className="badge font-monospace text-white fw-bold px-2 py-1 mb-1"
+                  style={{ backgroundColor: "var(--color-teal-accent)" }}
+                >
                   Passo 2 de 2
                 </span>
                 <h2 className="h6 fw-bold mb-0 text-dark">
@@ -251,7 +266,11 @@ export default function NovoOrcamentoPage() {
               <button
                 type="button"
                 onClick={adicionarItem}
-                className="btn btn-warning text-dark btn-sm rounded-pill fw-bold px-3 shadow-sm"
+                className="btn btn-sm rounded-pill fw-bold px-3 shadow-sm text-white"
+                style={{
+                  backgroundColor: "var(--color-teal-accent)",
+                  borderColor: "var(--color-teal-accent)",
+                }}
               >
                 <i className="bi bi-plus-lg me-1"></i> Item
               </button>
@@ -318,6 +337,7 @@ export default function NovoOrcamentoPage() {
 
           <div style={{ height: "90px" }}></div>
 
+          {/* Rodapé Fixo */}
           <div className="fixed-bottom bg-white border-top shadow-lg p-3">
             <div
               className="container p-0 d-flex align-items-center justify-content-between"
